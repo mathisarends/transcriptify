@@ -2,9 +2,13 @@ import io
 import logging
 from collections.abc import AsyncIterator
 
+from pydantic import TypeAdapter, ValidationError
+
 from transcriptify.adapters.openai.schemas import (
     DiarizedTranscription,
     Transcription,
+    TranscriptionRequestParams,
+    TranscriptStreamEvent,
     TranscriptTextDelta,
     TranscriptTextDone,
     TranscriptTextSegment,
@@ -12,53 +16,40 @@ from transcriptify.adapters.openai.schemas import (
 )
 from transcriptify.adapters.openai.views import ResponseFormat, WhisperModel
 from transcriptify.port.transcriber import Transcriber
-from transcriptify.views import AudioChunk, TranscriptionDelta, TranscriptionResult
+from transcriptify.views import (
+    AudioChunk,
+    TranscriptionDelta,
+    TranscriptionDeltaType,
+    TranscriptionResult,
+)
 
 import openai
 
 logger = logging.getLogger(__name__)
 
-
-_WHISPER_ONLY_FORMATS: set[str] = {
-    ResponseFormat.VERBOSE_JSON,
-    ResponseFormat.SRT,
-    ResponseFormat.VTT,
-}
-
-_GPT4O_FORMATS: set[str] = {
-    ResponseFormat.JSON,
-    ResponseFormat.TEXT,
-}
-
-_DIARIZE_FORMATS: set[str] = {
-    ResponseFormat.JSON,
-    ResponseFormat.TEXT,
-    ResponseFormat.DIARIZED_JSON,
-}
-
-_STREAMABLE_MODELS: set[str] = {
-    WhisperModel.GPT_4O_TRANSCRIBE,
-    WhisperModel.GPT_4O_MINI_TRANSCRIBE,
-    WhisperModel.GPT_4O_TRANSCRIBE_DIARIZE,
-}
-
-_DIARIZE_MODELS: set[str] = {
-    WhisperModel.GPT_4O_TRANSCRIBE_DIARIZE,
-}
-
-_PROMPT_MODELS: set[str] = {
-    WhisperModel.WHISPER_1,
-    WhisperModel.GPT_4O_TRANSCRIBE,
-    WhisperModel.GPT_4O_MINI_TRANSCRIBE,
-}
+_stream_event_adapter: TypeAdapter[TranscriptStreamEvent] = TypeAdapter(
+    TranscriptStreamEvent
+)
 
 
 class OpenAIWhisper(Transcriber):
-    """OpenAI / Azure OpenAI transcription adapter.
-
-    Supports batch and streaming modes, including speaker diarization
-    via ``gpt-4o-transcribe-diarize``.
-    """
+    _GPT4O_FORMATS: set[str] = {
+        ResponseFormat.JSON,
+        ResponseFormat.TEXT,
+    }
+    _DIARIZE_FORMATS: set[str] = {
+        ResponseFormat.JSON,
+        ResponseFormat.TEXT,
+        ResponseFormat.DIARIZED_JSON,
+    }
+    _STREAMABLE_MODELS: set[str] = {
+        WhisperModel.GPT_4O_TRANSCRIBE,
+        WhisperModel.GPT_4O_MINI_TRANSCRIBE,
+        WhisperModel.GPT_4O_TRANSCRIBE_DIARIZE,
+    }
+    _DIARIZE_MODELS: set[str] = {
+        WhisperModel.GPT_4O_TRANSCRIBE_DIARIZE,
+    }
 
     _DEFAULT_API_VERSION = "2024-06-01"
 
@@ -70,11 +61,9 @@ class OpenAIWhisper(Transcriber):
         language: str | None = None,
         response_format: ResponseFormat | str = ResponseFormat.JSON,
         prompt: str | None = None,
-        # --- diarization options ---
         chunking_strategy: str | None = None,
         known_speaker_names: list[str] | None = None,
         known_speaker_references: list[str] | None = None,
-        # --- azure options ---
         azure_endpoint: str | None = None,
         azure_deployment: str | None = None,
         api_version: str | None = None,
@@ -104,14 +93,13 @@ class OpenAIWhisper(Transcriber):
         fmt = self._response_format
 
         is_whisper = model == WhisperModel.WHISPER_1
-        is_diarize = model in _DIARIZE_MODELS
-        is_gpt4o = model in (
+        is_diarize = model in self._DIARIZE_MODELS
+        is_gpt_4o = model in (
             WhisperModel.GPT_4O_TRANSCRIBE,
             WhisperModel.GPT_4O_MINI_TRANSCRIBE,
         )
 
-        # response_format compatibility
-        if is_gpt4o and fmt not in _GPT4O_FORMATS:
+        if is_gpt_4o and fmt not in self._GPT4O_FORMATS:
             logger.warning(
                 "Model %r only supports response_format 'json' or 'text', "
                 "got %r — the API will reject this request.",
@@ -125,7 +113,7 @@ class OpenAIWhisper(Transcriber):
                 model,
             )
 
-        if is_diarize and fmt not in _DIARIZE_FORMATS:
+        if is_diarize and fmt not in self._DIARIZE_FORMATS:
             logger.warning(
                 "Model %r only supports response_format 'json', 'text', "
                 "or 'diarized_json', got %r.",
@@ -133,7 +121,6 @@ class OpenAIWhisper(Transcriber):
                 fmt,
             )
 
-        # diarization options on non-diarize model
         if not is_diarize:
             if self._known_speaker_names or self._known_speaker_references:
                 logger.warning(
@@ -150,20 +137,17 @@ class OpenAIWhisper(Transcriber):
                     model,
                 )
 
-        # prompt not supported on diarize model
         if is_diarize and self._prompt:
             logger.warning(
                 "Model %r does not support the prompt parameter.",
                 model,
             )
 
-        # whisper-1 does not support streaming
         if is_whisper:
             logger.debug(
                 "Model %r does not support streaming transcription.",
                 model,
             )
-
 
     @staticmethod
     def _to_file(audio: AudioChunk) -> io.BytesIO:
@@ -172,32 +156,31 @@ class OpenAIWhisper(Transcriber):
         buf.name = f"audio.{ext}"
         return buf
 
-    def _base_kwargs(self, audio: AudioChunk) -> dict:
-        kwargs: dict = {
-            "model": self._model,
-            "file": self._to_file(audio),
-            "response_format": self._response_format,
-        }
-        if self._language:
-            kwargs["language"] = self._language
-        if self._prompt:
-            kwargs["prompt"] = self._prompt
-        if self._chunking_strategy:
-            kwargs["chunking_strategy"] = self._chunking_strategy
-
-        extra_body: dict = {}
+    def _build_params(self, audio: AudioChunk) -> TranscriptionRequestParams:
+        extra_body: dict | None = None
+        raw_extra: dict = {}
         if self._known_speaker_names:
-            extra_body["known_speaker_names"] = self._known_speaker_names
+            raw_extra["known_speaker_names"] = self._known_speaker_names
         if self._known_speaker_references:
-            extra_body["known_speaker_references"] = self._known_speaker_references
-        if extra_body:
-            kwargs["extra_body"] = extra_body
+            raw_extra["known_speaker_references"] = self._known_speaker_references
+        if raw_extra:
+            extra_body = raw_extra
 
-        return kwargs
+        return TranscriptionRequestParams(
+            model=self._model,
+            file=self._to_file(audio),
+            response_format=self._response_format,
+            language=self._language,
+            prompt=self._prompt,
+            chunking_strategy=self._chunking_strategy,
+            extra_body=extra_body,
+        )
 
     async def transcribe(self, audio: AudioChunk) -> TranscriptionResult:
+        transcription_request_params = self._build_params(audio)
+
         response = await self._client.audio.transcriptions.create(
-            **self._base_kwargs(audio),
+            **transcription_request_params.to_api_kwargs(),
         )
         return self._parse(response)
 
@@ -209,10 +192,7 @@ class OpenAIWhisper(Transcriber):
             return TranscriptionResult(
                 text=verbose.text,
                 language=verbose.language,
-                segments=[
-                    {"start": s.start, "end": s.end, "text": s.text}
-                    for s in verbose.segments
-                ],
+                segments=verbose.segments,
                 raw=verbose,
             )
 
@@ -222,15 +202,7 @@ class OpenAIWhisper(Transcriber):
             )
             return TranscriptionResult(
                 text=diarized.text,
-                segments=[
-                    {
-                        "speaker": s.speaker,
-                        "start": s.start,
-                        "end": s.end,
-                        "text": s.text,
-                    }
-                    for s in diarized.segments
-                ],
+                segments=diarized.segments,
                 raw=diarized,
             )
 
@@ -240,59 +212,58 @@ class OpenAIWhisper(Transcriber):
         plain = Transcription.model_validate(response, from_attributes=True)
         return TranscriptionResult(text=plain.text, raw=plain)
 
-
-    async def transcribe_streaming(
-        self, audio: AudioChunk
-    ) -> AsyncIterator[TranscriptionDelta]:
+    async def stream(self, audio: AudioChunk) -> AsyncIterator[TranscriptionDelta]:
         """Stream transcription deltas using OpenAI ``stream=True``.
 
-        Raises a warning and falls back to batch if the model does not
-        support streaming.
+        Falls back to batch if the model does not support streaming.
         """
-        if self._model not in _STREAMABLE_MODELS:
+        if self._model not in self._STREAMABLE_MODELS:
             logger.warning(
                 "Model %r does not support streaming — falling back to batch.",
                 self._model,
             )
             result = await self.transcribe(audio)
             yield TranscriptionDelta(
-                text=result.text, type="done", full_text=result.text
+                text=result.text,
+                type=TranscriptionDeltaType.DONE,
+                full_text=result.text,
             )
             return
 
-        kwargs = self._base_kwargs(audio)
+        transcription_request_params = self._build_params(audio)
+        kwargs = transcription_request_params.to_api_kwargs()
         kwargs["stream"] = True
 
         stream = await self._client.audio.transcriptions.create(**kwargs)
 
         full_text = ""
         async for event in stream:
-            event_type = getattr(event, "type", None)
-
-            if event_type == "transcript.text.delta":
-                delta = TranscriptTextDelta.model_validate(
+            try:
+                parsed = _stream_event_adapter.validate_python(
                     event, from_attributes=True
                 )
-                full_text += delta.delta
-                yield TranscriptionDelta(text=delta.delta, type="delta")
+            except ValidationError:
+                continue
 
-            elif event_type == "transcript.text.segment":
-                seg = TranscriptTextSegment.model_validate(
-                    event, from_attributes=True
-                )
+            if isinstance(parsed, TranscriptTextDelta):
+                full_text += parsed.delta
                 yield TranscriptionDelta(
-                    text=seg.text,
-                    type="segment",
-                    speaker=seg.speaker,
-                    start=seg.start,
-                    end=seg.end,
+                    text=parsed.delta, type=TranscriptionDeltaType.DELTA
                 )
 
-            elif event_type == "transcript.text.done":
-                done = TranscriptTextDone.model_validate(
-                    event, from_attributes=True
-                )
-                full_text = done.text
+            elif isinstance(parsed, TranscriptTextSegment):
                 yield TranscriptionDelta(
-                    text=full_text, type="done", full_text=full_text
+                    text=parsed.text,
+                    type=TranscriptionDeltaType.SEGMENT,
+                    speaker=parsed.speaker,
+                    start=parsed.start,
+                    end=parsed.end,
+                )
+
+            elif isinstance(parsed, TranscriptTextDone):
+                full_text = parsed.text
+                yield TranscriptionDelta(
+                    text=full_text,
+                    type=TranscriptionDeltaType.DONE,
+                    full_text=full_text,
                 )

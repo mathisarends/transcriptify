@@ -1,13 +1,13 @@
 import asyncio
-import os
 import sys
 
-from transcriptify.adapters.openai import OpenAIWhisper, WhisperModel, VerboseTranscription
+from transcriptify.adapters.openai import OpenAIWhisper, VerboseTranscription
 from transcriptify.audio import FileAudioDevice
 
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
+
 
 async def main() -> None:
     if len(sys.argv) < 2:

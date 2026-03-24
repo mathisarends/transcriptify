@@ -11,7 +11,11 @@ from transcriptify.adapters.openai import (
 )
 from transcriptify.port.audio_device import AudioDevice
 from transcriptify.port.transcriber import Transcriber
-from transcriptify.views import AudioChunk, TranscriptionDelta, TranscriptionResult
+from transcriptify.views import (
+    AudioChunk,
+    TranscriptionDelta,
+    TranscriptionResult,
+)
 
 __all__ = [
     "AudioChunk",

@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from transcriptify.views import AudioChunk
 from transcriptify.port.audio_device import AudioDevice
 
+
 class FileAudioDevice(AudioDevice):
     """Reads audio from a file on disk.
 
@@ -51,9 +52,7 @@ class FileAudioDevice(AudioDevice):
                 sample_rate = wf.getframerate()
                 channels = wf.getnchannels()
                 sample_width = wf.getsampwidth()
-                frames_per_chunk = int(
-                    sample_rate * self._chunk_duration_ms / 1000
-                )
+                frames_per_chunk = int(sample_rate * self._chunk_duration_ms / 1000)
                 bytes_per_frame = channels * sample_width
 
                 while True:

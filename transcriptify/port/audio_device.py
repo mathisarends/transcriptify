@@ -13,12 +13,10 @@ class AudioDevice(ABC):
     """
 
     @abstractmethod
-    async def read(self) -> AudioChunk:
-        ...
+    async def read(self) -> AudioChunk: ...
 
     @abstractmethod
-    def stream(self) -> AsyncIterator[AudioChunk]:
-        ...
+    def stream(self) -> AsyncIterator[AudioChunk]: ...
 
     async def __aenter__(self) -> Self:
         return self

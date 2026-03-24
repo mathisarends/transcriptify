@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from enum import StrEnum
+from typing import Any
 
 
 @dataclass
@@ -20,12 +21,18 @@ class TranscriptionResult:
     raw: Any = None
 
 
+class TranscriptionDeltaType(StrEnum):
+    DELTA = "delta"
+    SEGMENT = "segment"
+    DONE = "done"
+
+
 @dataclass
 class TranscriptionDelta:
     """A single chunk emitted during streaming transcription."""
 
     text: str
-    type: Literal["delta", "segment", "done"]
+    type: TranscriptionDeltaType
     full_text: str | None = None
     speaker: str | None = None
     start: float | None = None
