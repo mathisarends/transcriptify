@@ -4,7 +4,7 @@ import io
 from typing import Self
 import wave
 
-from transcriptify.port.audio_device import AudioDevice
+from transcriptify.audio.port import AudioDevice
 from transcriptify.views import AudioChunk
 
 try:

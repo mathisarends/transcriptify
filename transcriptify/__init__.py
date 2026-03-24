@@ -1,4 +1,4 @@
-from transcriptify.adapters.openai import (
+from .adapters.openai import (
     DiarizedSegment,
     DiarizedTranscription,
     OpenAIWhisper,
@@ -9,9 +9,9 @@ from transcriptify.adapters.openai import (
     VerboseTranscription,
     WhisperModel,
 )
-from transcriptify.audio.port import AudioDevice
-from transcriptify.port import Transcriber
-from transcriptify.views import (
+from .audio.port import AudioDevice
+from .port import Transcriber
+from .views import (
     AudioChunk,
     TranscriptionDelta,
     TranscriptionResult,
