@@ -20,7 +20,7 @@ class FileAudioDevice(AudioDevice):
     def _read_wav(self) -> AudioChunk:
         with wave.open(str(self._path), "rb") as wf:
             return AudioChunk(
-                data=wf.readframes(wf.getnframes()),
+                data=self._path.read_bytes(),
                 sample_rate=wf.getframerate(),
                 channels=wf.getnchannels(),
                 encoding="pcm_s16le",

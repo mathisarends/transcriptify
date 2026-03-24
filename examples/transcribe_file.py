@@ -5,6 +5,9 @@ import sys
 from transcriptify.adapters.openai import OpenAIWhisper, WhisperModel, VerboseTranscription
 from transcriptify.audio import FileAudioDevice
 
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
 
 async def main() -> None:
     if len(sys.argv) < 2:
@@ -12,15 +15,7 @@ async def main() -> None:
         sys.exit(1)
 
     path = sys.argv[1]
-    use_azure = "--azure" in sys.argv
-    api_key = os.environ.get("OPENAI_API_KEY")
-
-    if use_azure:
-        whisper = OpenAIWhisper(
-            api_key=api_key
-        )
-    else:
-        whisper = OpenAIWhisper(api_key=api_key, model=WhisperModel.WHISPER_1)
+    whisper = OpenAIWhisper()
 
     async with FileAudioDevice(path) as device:
         audio = await device.read()
@@ -32,8 +27,9 @@ async def main() -> None:
     if isinstance(result.raw, VerboseTranscription):
         for seg in result.raw.segments:
             print(f"  [{seg.start:.1f}s - {seg.end:.1f}s] {seg.text}")
-        for word in result.raw.words:
-            print(f"  [{word.start:.1f}s - {word.end:.1f}s] {word.word}")
+        if result.raw.words:
+            for word in result.raw.words:
+                print(f"  [{word.start:.1f}s - {word.end:.1f}s] {word.word}")
 
 
 if __name__ == "__main__":

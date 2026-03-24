@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 
 @dataclass
@@ -18,3 +18,15 @@ class TranscriptionResult:
     confidence: float | None = None
     segments: list[dict[str, Any]] = field(default_factory=list)
     raw: Any = None
+
+
+@dataclass
+class TranscriptionDelta:
+    """A single chunk emitted during streaming transcription."""
+
+    text: str
+    type: Literal["delta", "segment", "done"]
+    full_text: str | None = None
+    speaker: str | None = None
+    start: float | None = None
+    end: float | None = None

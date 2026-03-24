@@ -5,6 +5,7 @@ class WhisperModel(StrEnum):
     WHISPER_1 = "whisper-1"
     GPT_4O_TRANSCRIBE = "gpt-4o-transcribe"
     GPT_4O_MINI_TRANSCRIBE = "gpt-4o-mini-transcribe"
+    GPT_4O_TRANSCRIBE_DIARIZE = "gpt-4o-transcribe-diarize"
 
 
 class ResponseFormat(StrEnum):
@@ -13,3 +14,4 @@ class ResponseFormat(StrEnum):
     SRT = "srt"
     VTT = "vtt"
     VERBOSE_JSON = "verbose_json"
+    DIARIZED_JSON = "diarized_json"

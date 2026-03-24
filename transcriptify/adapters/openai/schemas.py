@@ -1,6 +1,11 @@
-from typing import TypeAlias
+from typing import Literal, Union
 
 from pydantic import BaseModel
+
+
+# ------------------------------------------------------------------
+# Batch response schemas
+# ------------------------------------------------------------------
 
 
 class TranscriptionSegment(BaseModel):
@@ -31,7 +36,45 @@ class VerboseTranscription(BaseModel):
     language: str
     text: str
     segments: list[TranscriptionSegment] = []
-    words: list[TranscriptionWord] = []
+    words: list[TranscriptionWord] | None = None
 
 
-TranscriptionCreateResponse: TypeAlias = Transcription | VerboseTranscription
+class DiarizedSegment(BaseModel):
+    speaker: str
+    text: str
+    start: float
+    end: float
+
+
+class DiarizedTranscription(BaseModel):
+    text: str
+    segments: list[DiarizedSegment] = []
+
+
+TranscriptionCreateResponse = Union[
+    Transcription, VerboseTranscription, DiarizedTranscription
+]
+
+
+# ------------------------------------------------------------------
+# Streaming event schemas
+# ------------------------------------------------------------------
+
+
+class TranscriptTextDelta(BaseModel):
+    type: Literal["transcript.text.delta"] = "transcript.text.delta"
+    delta: str
+    logprobs: list[float] | None = None
+
+
+class TranscriptTextDone(BaseModel):
+    type: Literal["transcript.text.done"] = "transcript.text.done"
+    text: str
+
+
+class TranscriptTextSegment(BaseModel):
+    type: Literal["transcript.text.segment"] = "transcript.text.segment"
+    text: str
+    speaker: str | None = None
+    start: float
+    end: float

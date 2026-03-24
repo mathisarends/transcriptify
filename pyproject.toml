@@ -6,6 +6,8 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.12.5",
+    "python-dotenv>=1.2.2",
+    "openai>=2.29.0",
 ]
 
 [project.optional-dependencies]
@@ -13,15 +15,12 @@ microphone = [
     "sounddevice>=0.4",
     "numpy>=1.24",
 ]
-all = ["transcriptify[openai,microphone]"]
+all = ["transcriptify[microphone]"]
 dev = [
     "pytest",
     "pytest-asyncio",
     "ruff",
     "mypy",
-]
-openai = [
-    "openai>=2.29.0",
 ]
 
 [build-system]
