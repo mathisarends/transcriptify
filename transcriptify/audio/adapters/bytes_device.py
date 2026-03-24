@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator
 from typing import Self
 
 from transcriptify.views import AudioChunk
-from transcriptify.port.audio_device import AudioDevice
+from transcriptify.audio.port import AudioDevice
 
 
 class BytesAudioDevice(AudioDevice):
@@ -27,25 +27,26 @@ class BytesAudioDevice(AudioDevice):
     @classmethod
     def from_stream(
         cls,
-        queue: asyncio.Queue[bytes | None],
         sample_rate: int = 16_000,
         encoding: str = "wav",
     ) -> Self:
         device = cls(data=b"", sample_rate=sample_rate, encoding=encoding)
-        device._queue = queue
+        device._queue = asyncio.Queue()
         return device
+
+    async def push(self, data: bytes | None) -> None:
+        """Push a chunk into the stream. Pass None to signal EOF."""
+        if self._queue is None:
+            raise RuntimeError(
+                "push() is only supported on stream devices (use from_stream())"
+            )
+        await self._queue.put(data)
 
     async def read(self) -> AudioChunk:
         if self._queue is not None:
             data = await self._queue.get()
-            if data is None:
-                return AudioChunk(
-                    data=b"",
-                    sample_rate=self._sample_rate,
-                    encoding=self._encoding,
-                )
             return AudioChunk(
-                data=data,
+                data=data or b"",
                 sample_rate=self._sample_rate,
                 encoding=self._encoding,
             )

@@ -15,7 +15,7 @@ from transcriptify.adapters.openai.schemas import (
     VerboseTranscription,
 )
 from transcriptify.adapters.openai.views import ResponseFormat, WhisperModel
-from transcriptify.port.transcriber import Transcriber
+from transcriptify.port import Transcriber
 from transcriptify.views import (
     AudioChunk,
     TranscriptionDelta,

@@ -9,8 +9,8 @@ from transcriptify.adapters.openai import (
     VerboseTranscription,
     WhisperModel,
 )
-from transcriptify.port.audio_device import AudioDevice
-from transcriptify.port.transcriber import Transcriber
+from transcriptify.audio.port import AudioDevice
+from transcriptify.port import Transcriber
 from transcriptify.views import (
     AudioChunk,
     TranscriptionDelta,

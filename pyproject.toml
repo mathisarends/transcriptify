@@ -11,9 +11,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-microphone = [
+mic = [
     "sounddevice>=0.4",
-    "numpy>=1.24",
 ]
 dev = [
     "pytest",

@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+import abc
 from collections.abc import AsyncIterator
 
 from transcriptify.views import (
@@ -9,10 +9,10 @@ from transcriptify.views import (
 )
 
 
-class Transcriber(ABC):
+class Transcriber(abc.ABC):
     """Adapter interface. Every transcription backend implements this."""
 
-    @abstractmethod
+    @abc.abstractmethod
     async def transcribe(self, audio: AudioChunk) -> TranscriptionResult:
         """Transcribe a single audio chunk."""
         ...

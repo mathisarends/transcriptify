@@ -4,7 +4,7 @@ from pathlib import Path
 from collections.abc import AsyncIterator
 
 from transcriptify.views import AudioChunk
-from transcriptify.port.audio_device import AudioDevice
+from transcriptify.audio.port import AudioDevice
 
 
 class FileAudioDevice(AudioDevice):

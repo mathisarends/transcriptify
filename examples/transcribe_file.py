@@ -1,7 +1,7 @@
 import asyncio
 import sys
 
-from transcriptify.adapters.openai import OpenAIWhisper, VerboseTranscription
+from transcriptify import OpenAIWhisper, VerboseTranscription
 from transcriptify.audio import FileAudioDevice
 
 from dotenv import load_dotenv

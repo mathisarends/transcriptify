@@ -1,8 +1,7 @@
-from .adapters import BytesAudioDevice, FileAudioDevice
-from .port import AudioDevice
+from .bytes_device import BytesAudioDevice
+from .file import FileAudioDevice
 
 __all__ = [
-    "AudioDevice",
     "BytesAudioDevice",
     "FileAudioDevice",
     "MicrophoneAudioDevice",
@@ -11,7 +10,7 @@ __all__ = [
 
 def __getattr__(name: str):
     if name == "MicrophoneAudioDevice":
-        from .adapters.mic import MicrophoneAudioDevice
+        from .mic import MicrophoneAudioDevice
 
         return MicrophoneAudioDevice
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
