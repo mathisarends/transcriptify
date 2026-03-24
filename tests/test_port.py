@@ -5,9 +5,7 @@ from transcriptify.views import AudioChunk, TranscriptionDeltaType, Transcriptio
 
 
 class _ConcreteTranscriber(Transcriber):
-    """Minimal concrete implementation used to test the base class contract."""
-
-    async def transcribe(self, audio: AudioChunk) -> TranscriptionResult:
+    async def transcribe(self, _: AudioChunk) -> TranscriptionResult:
         return TranscriptionResult(text="hello")
 
 

@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run tests
+        run: uv run pytest
+        env:
+          # Tests use mocks only — no real API key needed.
+          # Setting a dummy value prevents any accidental load_dotenv from
+          # failing if a .env file is absent on CI.
+          OPENAI_API_KEY: sk-dummy

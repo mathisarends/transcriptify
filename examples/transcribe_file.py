@@ -1,5 +1,6 @@
 import asyncio
 import sys
+from pathlib import Path
 
 from transcriptify import OpenAIWhisper, VerboseTranscription
 from transcriptify.audio import FileAudioDevice
@@ -10,11 +11,9 @@ load_dotenv(override=True)
 
 
 async def main() -> None:
-    if len(sys.argv) < 2:
-        print(f"Usage: {sys.argv[0]} <audio-file> [--azure]")
-        sys.exit(1)
-
-    path = sys.argv[1]
+    path = (
+        Path(sys.argv[1]) if len(sys.argv) >= 2 else Path(__file__).parent / "audio.wav"
+    )
     whisper = OpenAIWhisper()
 
     async with FileAudioDevice(path) as device:
